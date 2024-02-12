@@ -1,0 +1,92 @@
+Spring boot Ecommerce Order Placing With Springboot Transaction
+-----------------------------------------------------------------
+In this project we are learning how you can use @Transaction Annotation to avoid Data inconsistency,
+
+eg: Lets say we have Order and Payament Classes
+when making order, sometimes the order data might be saved into database and Payment data might fail due to for example Wrong card type or insufficient amount,
+in this scenario we could face data inconsistency due to that order is already saved into table and payment is not saved.
+
+to avoid that we use Transaction Annotation from springboot
+
+
+eg: Order Class:
+
+@AllArgsConstructor
+@NoArgsConstructor
+@Getter
+@Setter
+@Entity
+@Table(name="orders")
+public class Order {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String orderTrackingNumber;
+    private int totalQuantity;
+    private BigDecimal totalPrice;
+    private String status;
+    @CreationTimestamp
+    private LocalDateTime dateCreated;
+    @UpdateTimestamp
+    private LocalDateTime lastUpdated;
+    private Long shoppingCartId;
+
+
+
+}
+
+
+Payment Class:
+
+@AllArgsConstructor
+@NoArgsConstructor
+@Getter
+@Setter
+@Entity
+@Table(name="payments")
+public class Payment {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String cardName;
+    private String cardNumber;
+    private int expiryYear;
+    private int expiryMonth;
+    private int cvc;
+    private Long orderId;
+    private String type;
+}
+
+
+In Service Class:
+
+
+@Override
+    @Transactional // we are using transaction to prevent data inconsistency so order and payment must be saved all together
+    public OrderResponse placeOrder(OrderRequest orderRequest) {
+        Order order = orderRequest.getOrder();
+        order.setStatus("INPROGRESS");
+        order.setOrderTrackingNumber(UUID.randomUUID().toString());
+        orderRepository.save(order);
+
+        Payment payment = orderRequest.getPayment();
+
+        if(!payment.getType().equalsIgnoreCase("DEBIT")){
+            throw new PaymentException("Payment card type do not support");
+        }else{
+            payment.setOrderId(order.getId());
+            paymentRepository.save(payment);
+        }
+
+        OrderResponse orderResponse = new OrderResponse();
+        orderResponse.setOrderTrackingNumber(order.getOrderTrackingNumber());
+        orderResponse.setStatus(order.getStatus());
+        orderResponse.setMessage("Successfully");
+
+        return orderResponse;
+    }
+
+By Annotating this function with @Transaction, it means that order to and payment should be saved all together, if one fails Order or Payment, then the data will be rolledback
